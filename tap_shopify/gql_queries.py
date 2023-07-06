@@ -26,6 +26,54 @@ query_incremental = """query tapShopify($first: Int, $after: String, $filter: St
     }
 }"""
 
+bulk_query = '''
+mutation {
+bulkOperationRunQuery(
+    query:"""
+        {
+            __query_name____filters__ {
+                edges {
+                    cursor
+                    node {
+                        __selected_fields__
+                    }
+                },
+                pageInfo {
+                    hasNextPage
+                }
+            }
+        }
+    """
+)
+    {
+        bulkOperation {
+            id
+            status
+        }
+        userErrors {
+            field
+            message
+        }
+    }
+}
+'''
+
+bulk_query_status = """
+query {
+    currentBulkOperation {
+        id
+        status
+        errorCode
+        createdAt
+        completedAt
+        objectCount
+        fileSize
+        url
+        partialDataUrl
+    }
+}
+"""
+
 schema_query = """query IntrospectionQuery {
   __schema {
     queryType {

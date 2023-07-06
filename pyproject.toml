@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "GraphQL-tap-shopify"
-version = "0.0.1"
+version = "1.0.0"
 description = "`tap-shopify` is a Singer tap for Shopify, built with the Meltano Singer SDK."
 readme = "README.md"
 authors = ["Josué Sehnem"]
@@ -14,7 +14,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "<3.12,>=3.7.1"
+python = "<3.12,>=3.8"
 singer-sdk = { version="^0.28.0" }
 fs-s3fs = { version = "^1.1.1", optional = true }
 requests = "^2.31.0"
@@ -37,7 +37,7 @@ ignore = [
 ]
 select = ["ALL"]
 src = ["tap_shopify"]
-target-version = "py37"
+target-version = "py38"
 
 
 [tool.ruff.flake8-annotations]

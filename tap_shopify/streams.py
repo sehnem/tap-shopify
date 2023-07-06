@@ -2,7 +2,41 @@
 
 from __future__ import annotations
 
-from tap_shopify.client import ShopifyStream
+from functools import cached_property
+from typing import Any, Iterable, Optional
+
+import requests  # noqa: TCH002
+
+from tap_shopify.client_bulk import shopifyBulkStream
+from tap_shopify.client_gql import shopifyGqlStream
+
+
+class ShopifyStream(shopifyGqlStream, shopifyBulkStream):
+    """Define base based on the type GraphQL or Bulk."""
+
+    def parse_response(self, response: requests.Response) -> Iterable[dict]:
+        """Parse the response and return an iterator of result rows."""
+        if self.config.get("bulk"):
+            return shopifyBulkStream.parse_response(self, response)
+        else:
+            return shopifyGqlStream.parse_response(self, response)
+
+    def get_next_page_token(
+        self, response: requests.Response, previous_token: Optional[Any]
+    ) -> Any:
+        """Return token identifying next page or None if all records have been read."""
+        if self.config.get("bulk"):
+            return shopifyBulkStream.get_next_page_token(self, response, previous_token)
+        else:
+            return shopifyGqlStream.get_next_page_token(self, response, previous_token)
+
+    @cached_property
+    def query(self) -> str:
+        """Set or return the GraphQL query string."""
+        if self.config.get("bulk"):
+            return shopifyBulkStream.query(self)
+        else:
+            return shopifyGqlStream.query(self)
 
 
 class CustomersStream(ShopifyStream):
@@ -11,28 +45,7 @@ class CustomersStream(ShopifyStream):
     name = "customers"
     gql_type = "Customer"
     query_name = "customers"
-    recursive_objs = ["customer"]
-    primary_keys = ["id"]
-    replication_key = "updatedAt"
-
-
-class InventoryItemsStream(ShopifyStream):
-    """Define inventory items stream."""
-
-    name = "inventory_items"
-    gql_type = "InventoryItem"
-    query_name = "inventoryItems"
-    recursive_objs = ["inventoryItem"]
-    primary_keys = ["id"]
-    replication_key = "updatedAt"
-
-
-class OrdersStream(ShopifyStream):
-    """Define orders lists stream."""
-
-    name = "orders"
-    gql_type = "Order"
-    query_name = "orders"
+    ignore_objs = ["customer", "paymentCollectionDetails"]
     primary_keys = ["id"]
     replication_key = "updatedAt"
 
@@ -43,16 +56,29 @@ class FulfillmentOrdersStream(ShopifyStream):
     name = "fulfillment_orders"
     gql_type = "FulfillmentOrder"
     query_name = "fulfillmentOrders"
+    ignore_objs = ["paymentCollectionDetails"]
     primary_keys = ["id"]
     replication_key = "updatedAt"
 
 
-class PriceListsStream(ShopifyStream):
-    """Define price lists stream."""
+class InventoryItemsStream(ShopifyStream):
+    """Define inventory items stream."""
 
-    name = "price_lists"
-    gql_type = "PriceList"
-    query_name = "priceLists"
+    name = "inventory_items"
+    gql_type = "InventoryItem"
+    query_name = "inventoryItems"
+    ignore_objs = ["inventoryItem"]
+    primary_keys = ["id"]
+    replication_key = "updatedAt"
+
+
+class OrdersStream(ShopifyStream):
+    """Define orders lists stream."""
+
+    name = "orders"
+    gql_type = "Order"
+    query_name = "orders"
+    ignore_objs = ["paymentCollectionDetails"]
     primary_keys = ["id"]
     replication_key = "updatedAt"
 
@@ -74,5 +100,5 @@ class VariantsStream(ShopifyStream):
     gql_type = "ProductVariant"
     query_name = "productVariants"
     primary_keys = ["id"]
-    recursive_objs = ["variant"]
+    ignore_objs = ["variant"]
     replication_key = "updatedAt"

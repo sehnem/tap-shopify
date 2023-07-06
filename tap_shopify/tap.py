@@ -39,6 +39,12 @@ class TapShopify(Tap):
             th.DateTimeType,
             description="The earliest record date to sync",
         ),
+        th.Property(
+            "bulk",
+            th.BooleanType,
+            default=False,
+            description="To use the bulk API or not",
+        ),
     ).to_dict()
 
     def discover_streams(self) -> list[streams.ShopifyStream]:
@@ -52,7 +58,6 @@ class TapShopify(Tap):
             streams.FulfillmentOrdersStream(self),
             streams.InventoryItemsStream(self),
             streams.OrdersStream(self),
-            streams.PriceListsStream(self),
             streams.ProductsStream(self),
             streams.VariantsStream(self),
         ]

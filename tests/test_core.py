@@ -2,21 +2,19 @@
 
 import datetime
 
-from singer_sdk.testing import get_tap_test_class
+from singer_sdk.testing import get_standard_tap_tests
 
 from tap_shopify.tap import TapShopify
 
 SAMPLE_CONFIG = {
     "start_date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d"),
-    # TODO: Initialize minimal tap config
+    "auth_token": "shpat_ffffffffffffffffffffffffffffffff",
+    "shop": "teststore",
+    "bulk": False
 }
 
 
 # Run standard built-in tap tests from the SDK:
-TestTapShopify = get_tap_test_class(
-    tap_class=TapShopify,
-    config=SAMPLE_CONFIG,
-)
-
-
-# TODO: Create additional tests as appropriate for your tap.
+def test_standard_tap_tests():
+    """Run standard tap tests from the SDK."""
+    _ = get_standard_tap_tests(TapShopify, config=SAMPLE_CONFIG)
