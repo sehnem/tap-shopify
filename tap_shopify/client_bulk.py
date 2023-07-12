@@ -11,6 +11,7 @@ from singer_sdk.helpers.jsonpath import extract_jsonpath
 from tap_shopify.client import ShopifyStream
 from tap_shopify.exceptions import InvalidOperation, OperationFailed
 from tap_shopify.gql_queries import bulk_query, bulk_query_status, simple_query
+from singer_sdk.pagination import SinglePagePaginator
 
 
 class shopifyBulkStream(ShopifyStream):
@@ -30,11 +31,11 @@ class shopifyBulkStream(ShopifyStream):
 
         return query
 
-    def get_next_page_token(
-        self, response: requests.Response, previous_token: Optional[Any]
-    ) -> Any:
-        """Return token identifying next page or None if all records have been read."""
-        return None
+    # def get_next_page_token(
+    #     self, response: requests.Response, previous_token: Optional[Any]
+    # ) -> Any:
+    #     """Return token identifying next page or None if all records have been read."""
+    #     return None
 
     @property
     def filters(self):
@@ -43,7 +44,7 @@ class shopifyBulkStream(ShopifyStream):
             start_date = self.get_starting_timestamp({})
             if start_date:
                 date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
-                return f'(query: "updated_at:>{date}")'
+                return f'query: "updated_at:>{date}"'
         return ""
 
     def get_operation_status(self):

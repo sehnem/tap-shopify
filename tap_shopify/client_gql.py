@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import math
-from time import sleep
 from typing import Any, Dict, Iterable, Optional
 
 import requests  # noqa: TCH002
@@ -16,28 +14,9 @@ from tap_shopify.gql_queries import query_incremental
 class shopifyGqlStream(ShopifyStream):
     """shopify stream class."""
 
-    @property
-    def page_size(self) -> int:
-        """Return the page size for the stream."""
-        if not self.available_points:
-            return 1
-        pages = self.available_points / self.query_cost
-        if pages < 5:
-            points_to_restore = self.max_points - self.available_points
-            sleep(points_to_restore // self.restore_rate - 1)
-            pages = (self.max_points - self.restore_rate) / self.query_cost
-            pages = pages - 1
-        elif self.query_cost and pages > 5:
-            if self.query_cost * pages >= 1000:
-                pages = math.floor(1000 / self.query_cost)
-            else:
-                pages = 250 if pages > 250 else pages
-        return int(pages)
-
     # @cached_property
     def query(self) -> str:
         """Set or return the GraphQL query string."""
-
         # This is for supporting the single object like shop endpoint
         # if not self.replication_key and not self.single_object_params:
         #     base_query = simple_query
@@ -53,29 +32,16 @@ class shopifyGqlStream(ShopifyStream):
 
         return query
 
-    def get_next_page_token(
-        self, response: requests.Response, previous_token: Optional[Any]
-    ) -> Any:
-        """Return token identifying next page or None if all records have been read."""
-        if not self.replication_key:
-            return None
-        response_json = response.json()
-        has_next_json_path = f"$.data.{self.query_name}.pageInfo.hasNextPage"
-        has_next = next(extract_jsonpath(has_next_json_path, response_json))
-        if has_next:
-            cursor_json_path = f"$.data.{self.query_name}.edges[-1].cursor"
-            all_matches = extract_jsonpath(cursor_json_path, response_json)
-            return next(all_matches, None)
-        return None
-
     def get_url_params(
         self, context: Optional[dict], next_page_token: Optional[Any]
     ) -> Dict[str, Any]:
         """Return a dictionary of values to be used in URL parameterization."""
         params = {}
-        params["first"] = self.page_size
+        
         if next_page_token:
-            params["after"] = next_page_token
+            params.update(next_page_token)
+        else:
+            params["first"] = 1
         if self.replication_key:
             start_date = self.get_starting_timestamp(context)
             if start_date:
@@ -95,12 +61,5 @@ class shopifyGqlStream(ShopifyStream):
 
         if response.get("errors"):
             raise Exception(response["errors"])
-
-        cost = response["extensions"].get("cost")
-        if not self.query_cost:
-            self.query_cost = cost.get("requestedQueryCost")
-        self.available_points = cost["throttleStatus"].get("currentlyAvailable")
-        self.restore_rate = cost["throttleStatus"].get("restoreRate")
-        self.max_points = cost["throttleStatus"].get("maximumAvailable")
 
         yield from extract_jsonpath(json_path, input=response)

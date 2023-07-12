@@ -16,14 +16,14 @@ class TapShopify(Tap):
     # TODO: Update this section with the actual config values you expect:
     config_jsonschema = th.PropertiesList(
         th.Property(
-            "auth_token",
+            "access_token",
             th.StringType,
             required=True,
             secret=True,
             description="The token to authenticate against the API service",
         ),
         th.Property(
-            "shop",
+            "store",
             th.StringType,
             required=True,
             description="The shopify shop name",

@@ -1,4 +1,4 @@
-"""GraphQL queries for Shopify API"""
+"""GraphQL queries for Shopify API."""
 
 simple_query = """query {
     __query_name__ {
@@ -31,7 +31,7 @@ mutation {
 bulkOperationRunQuery(
     query:"""
         {
-            __query_name____filters__ {
+            __query_name__(__filters__) {
                 edges {
                     cursor
                     node {

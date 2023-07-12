@@ -21,15 +21,6 @@ class ShopifyStream(shopifyGqlStream, shopifyBulkStream):
         else:
             return shopifyGqlStream.parse_response(self, response)
 
-    def get_next_page_token(
-        self, response: requests.Response, previous_token: Optional[Any]
-    ) -> Any:
-        """Return token identifying next page or None if all records have been read."""
-        if self.config.get("bulk"):
-            return shopifyBulkStream.get_next_page_token(self, response, previous_token)
-        else:
-            return shopifyGqlStream.get_next_page_token(self, response, previous_token)
-
     @cached_property
     def query(self) -> str:
         """Set or return the GraphQL query string."""
@@ -37,6 +28,17 @@ class ShopifyStream(shopifyGqlStream, shopifyBulkStream):
             return shopifyBulkStream.query(self)
         else:
             return shopifyGqlStream.query(self)
+
+
+class CustomCollectionsStream(ShopifyStream):
+    """Custom collections stream."""
+
+    name = "collections"
+    gql_type = "Collection"
+    query_name = "collections"
+    # ignore_objs = ["customer", "paymentCollectionDetails"]
+    primary_keys = ["id"]
+    replication_key = "updatedAt"
 
 
 class CustomersStream(ShopifyStream):

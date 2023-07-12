@@ -6,9 +6,11 @@ from functools import cached_property
 from inspect import stack
 from typing import Any, Optional
 
-import requests  # noqa: TCH002
 from singer_sdk import typing as th
 from singer_sdk.streams import GraphQLStream
+from tap_shopify.auth import ShopifyAuthenticator
+from tap_shopify.paginator import ShopifyPaginator
+from singer_sdk.pagination import SinglePagePaginator
 
 from tap_shopify.gql_queries import schema_query
 
@@ -35,20 +37,34 @@ class ShopifyStream(GraphQLStream):
     """Shopify stream class."""
 
     query_name = None
-    page_size = 1
-    query_cost = None
-    available_points = None
-    restore_rate = None
-    max_points = None
     single_object_params = None
     ignore_objs = []
+    _requests_session = None
 
     @property
     def url_base(self) -> str:
         """Return the API URL root, configurable via tap settings."""
-        shop = self.config.get("shop")
+        store = self.config.get("store")
         api_version = self.config.get("api_version")
-        return f"https://{shop}.myshopify.com/admin/api/{api_version}/graphql.json"
+        return f"https://{store}.myshopify.com/admin/api/{api_version}/graphql.json"
+
+    @property
+    def authenticator(self):
+        """Return a new authenticator object."""
+        return ShopifyAuthenticator(
+            self,
+            key="X-Shopify-Access-Token",
+            value=self.config["access_token"],
+            location="header",
+        )
+
+    @property
+    def get_new_paginator(self):
+        if not self.replication_key or self.config.get("bulk"):
+            paginator = SinglePagePaginator
+        else:
+            paginator = ShopifyPaginator
+        return paginator
 
     @property
     def http_headers(self) -> dict:
@@ -59,17 +75,24 @@ class ShopifyStream(GraphQLStream):
         """
         headers = {}
         headers["Content-Type"] = "application/json"
-        headers["X-Shopify-Access-Token"] = self.config.get("auth_token")
         return headers
 
     @cached_property
     def schema_gql(self) -> dict:
         """Return the schema for the stream."""
+
+        decorated_request = self.request_decorator(self._request)
         request_data = {"query": schema_query}
-        response = requests.post(
-            self.url_base, json=request_data, headers=self.http_headers
+
+        prepared_request = self.build_prepared_request(
+            method=self.rest_method,
+            url=self.url_base,
+            headers=self.http_headers,
+            json=request_data,
         )
-        return response.json()["data"]["__schema"]["types"]
+
+        resp = decorated_request(prepared_request, {})
+        return resp.json()["data"]["__schema"]["types"]
 
     @verify_recursion
     def extract_field_type(self, field) -> str:
@@ -82,6 +105,7 @@ class ShopifyStream(GraphQLStream):
         }
         name = field["name"]
         kind = field["kind"]
+
         if kind == "ENUM":
             return th.StringType
         elif kind == "NON_NULL":
