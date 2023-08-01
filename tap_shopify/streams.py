@@ -36,7 +36,6 @@ class CustomCollectionsStream(ShopifyStream):
     name = "collections"
     gql_type = "Collection"
     query_name = "collections"
-    # ignore_objs = ["customer", "paymentCollectionDetails"]
     primary_keys = ["id"]
     replication_key = "updatedAt"
 

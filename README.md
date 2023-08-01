@@ -1,6 +1,9 @@
 # tap-shopify
 
-`tap-shopify` is a Singer tap for Shopify.
+`tap-shopify` is a Singer tap for Shopify that uses the GraphQL API. This tap is currently in beta. The schema 
+definition is dynamic and retrieves all nested fields that are not connections to other objects. However, it 
+may require adjustments. Since we don’t have a real use case for the tap yet, we couldn’t determine the best 
+approach. We welcome contributions and feedback
 
 Built with the [Meltano Tap SDK](https://sdk.meltano.com) for Singer Taps.
 

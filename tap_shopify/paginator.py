@@ -1,15 +1,16 @@
+import math
+from functools import cached_property
+from time import sleep
+
+import requests
+from requests import Response
 from singer_sdk.helpers.jsonpath import extract_jsonpath
 from singer_sdk.pagination import BaseAPIPaginator
-import math
-import requests
-from time import sleep
-from requests import Response
-from functools import cached_property
 
 
 class ShopifyPaginator(BaseAPIPaginator):
     """shopify paginator class."""
-    
+
     query_cost = None
     available_points = None
     restore_rate = None
@@ -43,11 +44,11 @@ class ShopifyPaginator(BaseAPIPaginator):
             else:
                 pages = 250 if pages > 250 else pages
         return int(pages)
-    
+
     def query_name(self, response_json) -> str:
         """Set or return the GraphQL query name."""
         return list(response_json.get("data"))[0]
-    
+
     def get_next(self, response: requests.Response):
         """Get the next pagination value."""
 
@@ -55,7 +56,7 @@ class ShopifyPaginator(BaseAPIPaginator):
         query_name = self.query_name(response_json)
 
         cost = response_json["extensions"].get("cost")
-        
+
         self.query_cost = cost.get("requestedQueryCost")
         self.available_points = cost["throttleStatus"].get("currentlyAvailable")
         self.restore_rate = cost["throttleStatus"].get("restoreRate")
@@ -68,9 +69,9 @@ class ShopifyPaginator(BaseAPIPaginator):
             cursor_json_path = f"$.data.{query_name}.edges[-1].cursor"
             all_matches = extract_jsonpath(cursor_json_path, response_json)
             return next(all_matches, None)
-        
+
         return None
-    
+
     @property
     def current_value(self):
         """Get the current pagination value.

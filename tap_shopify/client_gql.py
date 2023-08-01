@@ -37,7 +37,7 @@ class shopifyGqlStream(ShopifyStream):
     ) -> Dict[str, Any]:
         """Return a dictionary of values to be used in URL parameterization."""
         params = {}
-        
+
         if next_page_token:
             params.update(next_page_token)
         else:

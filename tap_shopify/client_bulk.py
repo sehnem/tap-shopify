@@ -7,11 +7,11 @@ from typing import Any, Iterable, Optional, cast
 import requests
 import simplejson
 from singer_sdk.helpers.jsonpath import extract_jsonpath
+from singer_sdk.pagination import SinglePagePaginator
 
 from tap_shopify.client import ShopifyStream
 from tap_shopify.exceptions import InvalidOperation, OperationFailed
 from tap_shopify.gql_queries import bulk_query, bulk_query_status, simple_query
-from singer_sdk.pagination import SinglePagePaginator
 
 
 class shopifyBulkStream(ShopifyStream):

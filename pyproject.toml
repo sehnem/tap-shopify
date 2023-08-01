@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "GraphQL-tap-shopify"
-version = "1.0.0"
+version = "0.1.0"
 description = "`tap-shopify` is a Singer tap for Shopify, built with the Meltano Singer SDK."
 readme = "README.md"
 authors = ["Josué Sehnem"]

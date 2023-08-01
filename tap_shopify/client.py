@@ -7,12 +7,12 @@ from inspect import stack
 from typing import Any, Optional
 
 from singer_sdk import typing as th
-from singer_sdk.streams import GraphQLStream
-from tap_shopify.auth import ShopifyAuthenticator
-from tap_shopify.paginator import ShopifyPaginator
 from singer_sdk.pagination import SinglePagePaginator
+from singer_sdk.streams import GraphQLStream
 
+from tap_shopify.auth import ShopifyAuthenticator
 from tap_shopify.gql_queries import schema_query
+from tap_shopify.paginator import ShopifyPaginator
 
 
 def verify_recursion(func):
@@ -40,6 +40,7 @@ class ShopifyStream(GraphQLStream):
     single_object_params = None
     ignore_objs = []
     _requests_session = None
+    nested_connections = []
 
     @property
     def url_base(self) -> str:
@@ -130,7 +131,11 @@ class ShopifyStream(GraphQLStream):
         for field in fields:
             field_name = field["name"]
             # Ignore all the fields that need arguments
-            if field.get("args") or field.get("isDeprecated"):
+            if field.get("isDeprecated") and self.config.get("ignore_deprecated"):
+                continue
+            if field.get("args"):
+                if field["args"][0]["name"] == "first":
+                    self.nested_connections.append(field_name)
                 continue
             if field_name in self.ignore_objs:
                 continue

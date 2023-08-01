@@ -20,30 +20,36 @@ class TapShopify(Tap):
             th.StringType,
             required=True,
             secret=True,
-            description="The token to authenticate against the API service",
+            description="The token to authenticate against the API service.",
         ),
         th.Property(
             "store",
             th.StringType,
             required=True,
-            description="The shopify shop name",
+            description="The shopify shop name.",
         ),
         th.Property(
             "api_version",
             th.StringType,
             default="2023-04",
-            description="The version of the API to use",
+            description="The version of the API to use.",
         ),
         th.Property(
             "start_date",
             th.DateTimeType,
-            description="The earliest record date to sync",
+            description="The earliest record date to sync.",
         ),
         th.Property(
             "bulk",
             th.BooleanType,
             default=False,
-            description="To use the bulk API or not",
+            description="To use the bulk API or not.",
+        ),
+        th.Property(
+            "ignore_deprecated",
+            th.BooleanType,
+            default=True,
+            description="To ignore deprecated fields or not.",
         ),
     ).to_dict()
 

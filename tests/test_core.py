@@ -10,7 +10,7 @@ SAMPLE_CONFIG = {
     "start_date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d"),
     "auth_token": "shpat_ffffffffffffffffffffffffffffffff",
     "shop": "teststore",
-    "bulk": False
+    "bulk": False,
 }
 
 
