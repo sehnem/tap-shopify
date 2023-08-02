@@ -182,9 +182,15 @@ class ShopifyStream(GraphQLStream):
         """Return the selected properties from the schema."""
         selected_properties = []
         for key, value in self.metadata.items():
-            if isinstance(key, tuple) and len(key) == 2 and value.selected:
+            if isinstance(key, tuple) and len(key) == 2:
                 field_name = key[-1]
-                selected_properties.append(field_name)
+                if (
+                    value.selected
+                    or value.selected_by_default
+                    or field_name in self.primary_keys
+                    or field_name == self.replication_key
+                ):
+                    selected_properties.append(field_name)
         return selected_properties
 
     @property
