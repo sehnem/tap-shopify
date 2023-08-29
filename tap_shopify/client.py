@@ -81,19 +81,7 @@ class ShopifyStream(GraphQLStream):
     @cached_property
     def schema_gql(self) -> dict:
         """Return the schema for the stream."""
-
-        decorated_request = self.request_decorator(self._request)
-        request_data = {"query": schema_query}
-
-        prepared_request = self.build_prepared_request(
-            method=self.rest_method,
-            url=self.url_base,
-            headers=self.http_headers,
-            json=request_data,
-        )
-
-        resp = decorated_request(prepared_request, {})
-        return resp.json()["data"]["__schema"]["types"]
+        return self._tap.schema_gql
 
     @verify_recursion
     def extract_field_type(self, field) -> str:
@@ -107,14 +95,9 @@ class ShopifyStream(GraphQLStream):
         name = field["name"]
         kind = field["kind"]
 
-        if kind == "ENUM":
-            return th.StringType
-        elif kind == "NON_NULL":
-            type_def = field.get("type", field)["ofType"]
-            return self.extract_field_type(type_def)
-        elif kind == "SCALAR":
-            return type_mapping.get(name, th.StringType)
-        elif kind == "OBJECT":
+        if kind == "OBJECT":
+            if name in self._tap.gql_types_in_schema:
+                return th.ObjectType(th.Property("id", th.StringType))
             obj_schema = self.extract_gql_schema(name)
             properties = self.get_fields_schema(obj_schema["fields"])
             if properties:
@@ -124,6 +107,13 @@ class ShopifyStream(GraphQLStream):
             list_field_type = self.extract_field_type(obj_type)
             if list_field_type:
                 return th.ArrayType(list_field_type)
+        elif kind == "ENUM":
+            return th.StringType
+        elif kind == "NON_NULL":
+            type_def = field.get("type", field)["ofType"]
+            return self.extract_field_type(type_def)
+        elif kind == "SCALAR":
+            return type_mapping.get(name, th.StringType)
 
     def get_fields_schema(self, fields) -> dict:
         """Build the schema for the stream."""
@@ -173,6 +163,7 @@ class ShopifyStream(GraphQLStream):
             stream_catalog = next(stream, None)
             if stream_catalog:
                 return stream_catalog["schema"]
+        
         stream_type = self.extract_gql_schema(self.gql_type)
         properties = self.get_fields_schema(stream_type["fields"])
         return th.PropertiesList(*properties).to_dict()

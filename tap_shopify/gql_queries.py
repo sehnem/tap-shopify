@@ -159,3 +159,39 @@ fragment TypeRef on __Type {
     }
   }
 }"""
+
+
+queries_query = """{
+  __schema {
+    queryType {
+      fields {
+        name
+        type {
+          name
+          ofType {
+            name
+            fields {
+              name
+              type {
+                ofType {
+                  name
+                  kind
+                  ofType {
+                    name
+                    ofType {
+                      name
+                    }
+                    kind
+                  }
+                }
+              }
+            }
+          }
+        }
+        args {
+          name
+        }
+      }
+    }
+  }
+}"""
