@@ -41,9 +41,7 @@ class ShopifyPaginator(BaseAPIPaginator):
         elif self.query_cost and pages > 5:
             if self.query_cost * pages >= 1000:
                 pages = math.floor(1000 / self.query_cost)
-            else:
-                pages = 250 if pages > 250 else pages
-        return int(pages)
+        return 250 if pages > 250 else pages
 
     def query_name(self, response_json) -> str:
         """Set or return the GraphQL query name."""
@@ -66,7 +64,7 @@ class ShopifyPaginator(BaseAPIPaginator):
         has_next = next(extract_jsonpath(has_next_json_path, response_json))
 
         if has_next:
-            cursor_json_path = f"$.data.{query_name}.edges[-1].cursor"
+            cursor_json_path = f"$.data.{query_name}.pageInfo.endCursor"
             all_matches = extract_jsonpath(cursor_json_path, response_json)
             return next(all_matches, None)
 

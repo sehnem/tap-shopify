@@ -8,7 +8,6 @@ from functools import cached_property
 from tap_shopify.gql_queries import schema_query, queries_query
 from typing import Any, Iterable
 
-from tap_shopify import streams
 import requests
 import inflection
 
@@ -106,20 +105,42 @@ class TapShopify(Tap):
     @cached_property
     def schema_gql(self) -> dict:
         """Return the schema for the stream."""
-
         resp = self.request_gql(schema_query)
-
         return resp.json()["data"]["__schema"]["types"]
+
+    def filter_queries(self, query):
+        args = [a["name"] for a in query["args"]]
+        return "first" in args and "query" in args
 
     @cached_property
     def queries_gql(self) -> dict:
         """Return the schema for the stream."""
 
         resp = self.request_gql(queries_query)
+        jresp = resp.json()
+        queries = jresp["data"]["__schema"]["queryType"]["fields"]
+        return [q for q in queries if self.filter_queries(q)]
 
-        return resp.json()["data"]["__schema"]["queryType"]["fields"]
+    def extract_gql_node(self, query: dict) -> dict:
+        query_fields = query["type"]["ofType"]["fields"]
+        return next((f for f in query_fields if f["name"] == "nodes"), None)
 
-    def discover_streams(self) -> list[streams.ShopifyStream]:
+    def get_gql_query_type(self, node: dict) -> str:
+        return node["type"]["ofType"]["ofType"]["ofType"]["name"]
+
+    def get_type_fields(self, gql_type: str) -> list[dict]:
+        type_def = next(s for s in self.schema_gql if s["name"] == gql_type)
+
+        filtered_fields = [
+            f
+            for f in type_def["fields"]
+            if f["type"]["kind"] == "NON_NULL"
+            and f["type"]["ofType"]["kind"] == "SCALAR"
+        ]
+
+        return {f["name"]: f["type"]["ofType"] for f in filtered_fields}
+
+    def discover_streams(self) -> list[ShopifyStream]:
         """Return a list of discovered streams.
 
         Returns:
@@ -139,51 +160,32 @@ class TapShopify(Tap):
         streams = []
 
         for query in queries:
-            args = [a["name"] for a in query["args"]]
-            if "first" in args and "query" in args:
-                node = next(
-                    (
-                        f
-                        for f in query["type"]["ofType"]["fields"]
-                        if f["name"] == "nodes"
-                    ),
-                    None,
-                )
-                if node:
-                    gql_type = node["type"]["ofType"]["ofType"]["ofType"]["name"]
-                    gql_type_def = next(
-                        s for s in self.schema_gql if s["name"] == gql_type
-                    )
-                    fields_description = {
-                        f["name"]: f["type"]["ofType"]
-                        for f in gql_type_def["fields"]
-                        if f["type"]["kind"] == "NON_NULL"
-                        and f["type"]["ofType"]["kind"] == "SCALAR"
-                    }
+            node = self.extract_gql_node(query)
+            if not node:
+                continue
 
-                    # Get the primary key
-                    pk = [k for k, v in fields_description.items() if v["name"] == "ID"]
-                    if not pk or len(pk) > 1:
-                        continue
+            gql_type = self.get_gql_query_type(node)
+            fields_def = self.get_type_fields(gql_type)
 
-                    # Get the replication key
-                    date_fields = [
-                        k
-                        for k, v in fields_description.items()
-                        if v["name"] == "DateTime"
-                    ]
-                    rk = next((i for i in incremental_fields if i in date_fields), None)
+            # Get the primary key
+            pk = [k for k, v in fields_def.items() if v["name"] == "ID"]
+            if not pk:
+                continue
 
-                    self.gql_types_in_schema.append(gql_type)
+            # Get the replication key
+            date_fields = [k for k, v in fields_def.items() if v["name"] == "DateTime"]
+            rk = next((i for i in incremental_fields if i in date_fields), None)
 
-                    type_def = dict(
-                        name=inflection.underscore(query["name"]),
-                        query_name=query["name"],
-                        gql_type=gql_type,
-                        primary_keys=pk,
-                        replication_key=rk,
-                    )
-                    streams.append(type_def)
+            self.gql_types_in_schema.append(gql_type)
+
+            type_def = dict(
+                name=inflection.underscore(query["name"]),
+                query_name=query["name"],
+                gql_type=gql_type,
+                primary_keys=pk,
+                replication_key=rk,
+            )
+            streams.append(type_def)
 
         for type_def in streams:
             yield type(type_def["name"], (ShopifyStream,), type_def)(tap=self)

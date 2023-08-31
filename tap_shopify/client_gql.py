@@ -29,6 +29,8 @@ class shopifyGqlStream(ShopifyStream):
 
         query = base_query.replace("__query_name__", self.query_name)
         query = query.replace("__selected_fields__", self.gql_selected_fields)
+        additional_args = ", " + ", ".join(self.additional_arguments)
+        query = query.replace("__additional_args__", additional_args)
 
         return query
 
@@ -50,6 +52,19 @@ class shopifyGqlStream(ShopifyStream):
         if self.single_object_params:
             params = self.single_object_params
         return params
+    
+    def prepare_request_payload(
+        self, context: Optional[dict], next_page_token: Optional[Any]
+    ) -> Optional[dict]:
+        """Prepare the data payload for the GraphQL API request."""
+        params = self.get_url_params(context, next_page_token)
+        query = self.query.lstrip()
+        request_data = {
+            "query": query,
+            "variables": params,
+        }
+        self.logger.debug(f"Attempting query:\n{query}")
+        return request_data
 
     def parse_response(self, response: requests.Response) -> Iterable[dict]:
         """Parse the response and return an iterator of result rows."""

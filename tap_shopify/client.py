@@ -82,6 +82,14 @@ class ShopifyStream(GraphQLStream):
     def schema_gql(self) -> dict:
         """Return the schema for the stream."""
         return self._tap.schema_gql
+    
+    @cached_property
+    def additional_arguments(self) -> dict:
+        """Return the schema for the stream."""
+        gql_query = next(q for q in self._tap.queries_gql if q["name"]==self.query_name)
+        if "includeClosed" in [a["name"] for a in gql_query["args"]]:
+            return ["includeClosed: true"]
+        return []
 
     @verify_recursion
     def extract_field_type(self, field) -> str:
@@ -97,7 +105,7 @@ class ShopifyStream(GraphQLStream):
 
         if kind == "OBJECT":
             if name in self._tap.gql_types_in_schema:
-                return th.ObjectType(th.Property("id", th.StringType))
+                return th.ObjectType(th.Property("id", th.StringType, required=True))
             obj_schema = self.extract_gql_schema(name)
             properties = self.get_fields_schema(obj_schema["fields"])
             if properties:
@@ -132,11 +140,12 @@ class ShopifyStream(GraphQLStream):
             if field["type"]["kind"] == "INTERFACE":
                 continue
 
+            required = field["type"].get("kind") == "NON_NULL"
             type_def = field.get("type", field)
             type_def = type_def["ofType"] or type_def
             field_type = self.extract_field_type(type_def)
             if field_type:
-                property = th.Property(field_name, field_type)
+                property = th.Property(field_name, field_type, required=required)
                 properties.append(property)
         return properties
 
@@ -203,16 +212,3 @@ class ShopifyStream(GraphQLStream):
             return output
 
         return denest_schema(catalog)
-
-    def prepare_request_payload(
-        self, context: Optional[dict], next_page_token: Optional[Any]
-    ) -> Optional[dict]:
-        """Prepare the data payload for the GraphQL API request."""
-        params = self.get_url_params(context, next_page_token)
-        query = self.query.lstrip()
-        request_data = {
-            "query": query,
-            "variables": params,
-        }
-        self.logger.debug(f"Attempting query:\n{query}")
-        return request_data

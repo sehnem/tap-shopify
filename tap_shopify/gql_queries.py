@@ -13,15 +13,15 @@ simple_query_incremental = """query tapShopify($id: ID!) {
 }"""
 
 query_incremental = """query tapShopify($first: Int, $after: String, $filter: String) {
-    __query_name__(first: $first, after: $after, query: $filter) {
+    __query_name__(first: $first, after: $after, query: $filter__additional_args__) {
         edges {
-            cursor
             node {
                 __selected_fields__
             }
         },
         pageInfo {
             hasNextPage
+            endCursor
         }
     }
 }"""
@@ -33,13 +33,9 @@ bulkOperationRunQuery(
         {
             __query_name__(__filters__) {
                 edges {
-                    cursor
                     node {
                         __selected_fields__
                     }
-                },
-                pageInfo {
-                    hasNextPage
                 }
             }
         }

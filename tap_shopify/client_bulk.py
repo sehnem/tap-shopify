@@ -40,12 +40,15 @@ class shopifyBulkStream(ShopifyStream):
     @property
     def filters(self):
         """Return a dictionary of values to be used in URL parameterization."""
+        filters = []
+        if self.additional_arguments:
+            filters.extend(self.additional_arguments)
         if self.replication_key:
             start_date = self.get_starting_timestamp({})
             if start_date:
                 date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
-                return f'query: "updated_at:>{date}"'
-        return ""
+                filters.append(f'query: "updated_at:>{date}"')
+        return ",".join(filters)
 
     def get_operation_status(self):
         headers = self.http_headers
