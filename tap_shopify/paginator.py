@@ -41,7 +41,7 @@ class ShopifyPaginator(BaseAPIPaginator):
         elif self.query_cost and pages > 5:
             if self.query_cost * pages >= 1000:
                 pages = math.floor(1000 / self.query_cost)
-        return 250 if pages > 250 else pages
+        return 250 if pages > 250 else int(pages)
 
     def query_name(self, response_json) -> str:
         """Set or return the GraphQL query name."""

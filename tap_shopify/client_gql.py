@@ -72,9 +72,6 @@ class shopifyGqlStream(ShopifyStream):
             json_path = f"$.data.{self.query_name}.edges[*].node"
         else:
             json_path = f"$.data.{self.query_name}"
-        response = response.json()
+        json_resp = response.json()
 
-        if response.get("errors"):
-            raise Exception(response["errors"])
-
-        yield from extract_jsonpath(json_path, input=response)
+        yield from extract_jsonpath(json_path, json_resp)

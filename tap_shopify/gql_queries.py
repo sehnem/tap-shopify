@@ -31,7 +31,7 @@ mutation {
 bulkOperationRunQuery(
     query:"""
         {
-            __query_name__(__filters__) {
+            __query_name____filters__ {
                 edges {
                     node {
                         __selected_fields__

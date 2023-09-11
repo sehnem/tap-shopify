@@ -16,8 +16,6 @@ from tap_shopify.gql_queries import bulk_query, bulk_query_status, simple_query
 
 class shopifyBulkStream(ShopifyStream):
     """shopify stream class."""
-
-    # @cached_property
     def query(self) -> str:
         """Set or return the GraphQL query string."""
         if self.name == "shop":
@@ -27,15 +25,10 @@ class shopifyBulkStream(ShopifyStream):
 
         query = base_query.replace("__query_name__", self.query_name)
         query = query.replace("__selected_fields__", self.gql_selected_fields)
-        query = query.replace("__filters__", self.filters)
+        filters = f"({self.filters})" if self.filters else ""
+        query = query.replace("__filters__", filters)
 
         return query
-
-    # def get_next_page_token(
-    #     self, response: requests.Response, previous_token: Optional[Any]
-    # ) -> Any:
-    #     """Return token identifying next page or None if all records have been read."""
-    #     return None
 
     @property
     def filters(self):
@@ -97,14 +90,18 @@ class shopifyBulkStream(ShopifyStream):
     def parse_response(self, response: requests.Response) -> Iterable[dict]:
         """Parse the response and return an iterator of result rows."""
         operation_id_jsonpath = "$.data.bulkOperationRunQuery.bulkOperation.id"
-        request_response = response.json()
+        error_jsonpath = "$.data.bulkOperationRunQuery.userErrors"
+        json_resp = response.json()
+        errors = next(extract_jsonpath(error_jsonpath, json_resp), None)
+        if errors:
+            raise InvalidOperation(simplejson.dumps(errors))
         operation_id = next(
-            extract_jsonpath(operation_id_jsonpath, input=request_response)
+            extract_jsonpath(operation_id_jsonpath, json_resp)
         )
 
         url = self.check_status(operation_id)
 
-        output = requests.get(url, stream=True)
+        output = requests.get(url, stream=True, timeout=30)
 
         for line in output.iter_lines():
             yield simplejson.loads(line)

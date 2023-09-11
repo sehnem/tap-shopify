@@ -5,6 +5,11 @@ from __future__ import annotations
 from functools import cached_property
 from inspect import stack
 from typing import Any, Optional
+import requests
+
+from singer_sdk.exceptions import FatalAPIError, RetriableAPIError
+
+from http import HTTPStatus
 
 from singer_sdk import typing as th
 from singer_sdk.pagination import SinglePagePaginator
@@ -212,3 +217,35 @@ class ShopifyStream(GraphQLStream):
             return output
 
         return denest_schema(catalog)
+
+
+    def validate_response(self, response: requests.Response) -> None:
+        """Validate HTTP response."""
+
+        if (
+            response.status_code in self.extra_retry_statuses
+            or HTTPStatus.INTERNAL_SERVER_ERROR
+            <= response.status_code
+            <= max(HTTPStatus)
+        ):
+            msg = self.response_error_message(response)
+            raise RetriableAPIError(msg, response)
+        
+        json_resp = response.json()
+
+        if errors:=json_resp.get("errors"):
+            if len(errors)==1:
+                error = errors[0]
+                code = error.get("extensions", {}).get("code")
+                if code in ["THROTTLED", "MAX_COST_EXCEEDED"]:
+                    raise RetriableAPIError(error.get("message", ""), response)
+                raise FatalAPIError(error.get("message", ""))
+            raise RetriableAPIError(json_resp["errors"], response)
+
+        if (
+            HTTPStatus.BAD_REQUEST
+            <= response.status_code
+            < HTTPStatus.INTERNAL_SERVER_ERROR
+        ):
+            msg = self.response_error_message(response)
+            raise FatalAPIError(msg)

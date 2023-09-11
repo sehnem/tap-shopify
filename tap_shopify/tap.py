@@ -7,6 +7,7 @@ from singer_sdk import typing as th
 from functools import cached_property
 from tap_shopify.gql_queries import schema_query, queries_query
 from typing import Any, Iterable
+from singer_sdk.helpers.jsonpath import extract_jsonpath as jp
 
 import requests
 import inflection
@@ -58,7 +59,7 @@ class TapShopify(Tap):
         th.Property(
             "api_version",
             th.StringType,
-            default="2023-04",
+            default="2023-10",
             description="The version of the API to use.",
         ),
         th.Property(
@@ -96,6 +97,7 @@ class TapShopify(Tap):
             url=url,
             headers=headers,
             json=request_data,
+            timeout=30,
         )
 
         resp.raise_for_status()
@@ -106,7 +108,9 @@ class TapShopify(Tap):
     def schema_gql(self) -> dict:
         """Return the schema for the stream."""
         resp = self.request_gql(schema_query)
-        return resp.json()["data"]["__schema"]["types"]
+        json_resp = resp.json()
+        jsonpath = "$.data.__schema.types[*]"
+        return list(jp(jsonpath, json_resp))
 
     def filter_queries(self, query):
         args = [a["name"] for a in query["args"]]
@@ -117,26 +121,29 @@ class TapShopify(Tap):
         """Return the schema for the stream."""
 
         resp = self.request_gql(queries_query)
-        jresp = resp.json()
-        queries = jresp["data"]["__schema"]["queryType"]["fields"]
+        json_resp = resp.json()
+        jsonpath = "$.data.__schema.queryType.fields[*]"
+        queries = jp(jsonpath, json_resp)
         return [q for q in queries if self.filter_queries(q)]
 
     def extract_gql_node(self, query: dict) -> dict:
-        query_fields = query["type"]["ofType"]["fields"]
+        jsonpath = "$.type.ofType.fields[*]"
+        query_fields = jp(jsonpath, query)
         return next((f for f in query_fields if f["name"] == "nodes"), None)
 
     def get_gql_query_type(self, node: dict) -> str:
-        return node["type"]["ofType"]["ofType"]["ofType"]["name"]
+        jsonpath = "$.type.ofType.ofType.ofType.name"
+        return next(jp(jsonpath, node), None)
 
     def get_type_fields(self, gql_type: str) -> list[dict]:
         type_def = next(s for s in self.schema_gql if s["name"] == gql_type)
 
-        filtered_fields = [
-            f
-            for f in type_def["fields"]
-            if f["type"]["kind"] == "NON_NULL"
-            and f["type"]["ofType"]["kind"] == "SCALAR"
-        ]
+        filtered_fields = []
+        for field in type_def["fields"]:
+            type_kind = next(jp("type.kind", field), None)
+            field_kind = next(jp("type.ofType.kind", field), None)
+            if type_kind == "NON_NULL" and field_kind == "SCALAR":
+                filtered_fields.append(field)
 
         return {f["name"]: f["type"]["ofType"] for f in filtered_fields}
 
