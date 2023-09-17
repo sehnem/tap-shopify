@@ -74,6 +74,12 @@ class TapShopify(Tap):
             description="To use the bulk API or not.",
         ),
         th.Property(
+            "use_numeric_ids",
+            th.BooleanType,
+            default=False,
+            description="To use numeric ids instead of the graphql format ids.",
+        ),
+        th.Property(
             "ignore_deprecated",
             th.BooleanType,
             default=True,

@@ -249,3 +249,28 @@ class ShopifyStream(GraphQLStream):
         ):
             msg = self.response_error_message(response)
             raise FatalAPIError(msg)
+
+    def convert_id_fields(self, row: dict) -> dict:
+        """Convert the id fields to string."""
+        if not isinstance(row, dict):
+            return row
+        for key, value in row.items():
+            if key=="id" and isinstance(value, str):
+                row["id"] = row["id"].split("/")[-1].split("?")[0]
+            elif isinstance(value, dict):
+                row[key] = self.convert_id_fields(value)
+            elif isinstance(value, list):
+                row[key] = [self.convert_id_fields(v) for v in value]
+        return row
+
+    def post_process(
+        self,
+        row: dict,
+        context: dict | None = None,  # noqa: ARG002
+    ) -> dict | None:
+        """As needed, append or transform raw data to match expected structure."""
+
+        if self.config["use_numeric_ids"]:
+            self.convert_id_fields(row)
+
+        return row
