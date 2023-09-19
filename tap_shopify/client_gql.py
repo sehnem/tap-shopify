@@ -14,17 +14,8 @@ from tap_shopify.gql_queries import query_incremental
 class shopifyGqlStream(ShopifyStream):
     """shopify stream class."""
 
-    # @cached_property
-    def query(self) -> str:
+    def query_gql(self) -> str:
         """Set or return the GraphQL query string."""
-        # This is for supporting the single object like shop endpoint
-        # if not self.replication_key and not self.single_object_params:
-        #     base_query = simple_query
-        # elif self.single_object_params:
-        #     base_query = simple_query_incremental
-        # else:
-        #     base_query = query_incremental
-
         base_query = query_incremental
 
         query = base_query.replace("__query_name__", self.query_name)
@@ -66,7 +57,7 @@ class shopifyGqlStream(ShopifyStream):
         self.logger.debug(f"Attempting query:\n{query}")
         return request_data
 
-    def parse_response(self, response: requests.Response) -> Iterable[dict]:
+    def parse_response_gql(self, response: requests.Response) -> Iterable[dict]:
         """Parse the response and return an iterator of result rows."""
         if self.replication_key:
             json_path = f"$.data.{self.query_name}.edges[*].node"

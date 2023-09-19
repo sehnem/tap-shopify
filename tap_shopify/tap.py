@@ -12,27 +12,49 @@ from singer_sdk.helpers.jsonpath import extract_jsonpath as jp
 import requests
 import inflection
 
-from tap_shopify.client_bulk import shopifyBulkStream
-from tap_shopify.client_gql import shopifyGqlStream
+from tap_shopify.client import ShopifyStream
+
+# from tap_shopify.client_bulk import shopifyBulkStream
+# from tap_shopify.client_gql import shopifyGqlStream
 
 
-class ShopifyStream(shopifyGqlStream, shopifyBulkStream):
-    """Define base based on the type GraphQL or Bulk."""
+# class ShopifyStream(shopifyGqlStream, shopifyBulkStream):
+#     """Define base based on the type GraphQL or Bulk."""
 
-    def parse_response(self, response: requests.Response) -> Iterable[dict]:
-        """Parse the response and return an iterator of result rows."""
-        if self.config.get("bulk"):
-            return shopifyBulkStream.parse_response(self, response)
-        else:
-            return shopifyGqlStream.parse_response(self, response)
 
-    @cached_property
-    def query(self) -> str:
-        """Set or return the GraphQL query string."""
-        if self.config.get("bulk"):
-            return shopifyBulkStream.query(self)
-        else:
-            return shopifyGqlStream.query(self)
+#     def parse_response(self, response: requests.Response) -> Iterable[dict]:
+#         """Parse the response and return an iterator of result rows."""
+#         if self.config.get("bulk"):
+#             return shopifyBulkStream.parse_response(self, response)
+#         else:
+#             return shopifyGqlStream.parse_response(self, response)
+
+#     @cached_property
+#     def query(self) -> str:
+#         """Set or return the GraphQL query string."""
+#         if self.config.get("bulk"):
+#             return shopifyBulkStream.query(self)
+#         else:
+#             return shopifyGqlStream.query(self)
+    
+    # def evaluate_query(self) -> dict:
+    #     query = shopifyGqlStream.query(self)
+    #     params = self.get_url_params(None, None)
+    #     query = self.query.lstrip()
+    #     request_data = {
+    #         "query": query,
+    #         "variables": params,
+    #     }
+
+    #     response = requests.request(
+    #         method=self.rest_method,
+    #         url=self.get_url({}),
+    #         params=params,
+    #         headers=self.http_headers,
+    #         json=request_data,
+    #     )
+
+    #     return response
 
 
 class TapShopify(Tap):
