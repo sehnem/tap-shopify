@@ -2,59 +2,17 @@
 
 from __future__ import annotations
 
+from functools import cached_property
+from typing import Any, Iterable
+
+import inflection
+import requests
 from singer_sdk import Tap
 from singer_sdk import typing as th
-from functools import cached_property
-from tap_shopify.gql_queries import schema_query, queries_query
-from typing import Any, Iterable
 from singer_sdk.helpers.jsonpath import extract_jsonpath as jp
 
-import requests
-import inflection
-
 from tap_shopify.client import ShopifyStream
-
-# from tap_shopify.client_bulk import shopifyBulkStream
-# from tap_shopify.client_gql import shopifyGqlStream
-
-
-# class ShopifyStream(shopifyGqlStream, shopifyBulkStream):
-#     """Define base based on the type GraphQL or Bulk."""
-
-
-#     def parse_response(self, response: requests.Response) -> Iterable[dict]:
-#         """Parse the response and return an iterator of result rows."""
-#         if self.config.get("bulk"):
-#             return shopifyBulkStream.parse_response(self, response)
-#         else:
-#             return shopifyGqlStream.parse_response(self, response)
-
-#     @cached_property
-#     def query(self) -> str:
-#         """Set or return the GraphQL query string."""
-#         if self.config.get("bulk"):
-#             return shopifyBulkStream.query(self)
-#         else:
-#             return shopifyGqlStream.query(self)
-    
-    # def evaluate_query(self) -> dict:
-    #     query = shopifyGqlStream.query(self)
-    #     params = self.get_url_params(None, None)
-    #     query = self.query.lstrip()
-    #     request_data = {
-    #         "query": query,
-    #         "variables": params,
-    #     }
-
-    #     response = requests.request(
-    #         method=self.rest_method,
-    #         url=self.get_url({}),
-    #         params=params,
-    #         headers=self.http_headers,
-    #         json=request_data,
-    #     )
-
-    #     return response
+from tap_shopify.gql_queries import queries_query, schema_query
 
 
 class TapShopify(Tap):
@@ -92,7 +50,7 @@ class TapShopify(Tap):
         th.Property(
             "bulk",
             th.BooleanType,
-            default=False,
+            default=True,
             description="To use the bulk API or not.",
         ),
         th.Property(
@@ -171,6 +129,8 @@ class TapShopify(Tap):
             type_kind = next(jp("type.kind", field), None)
             field_kind = next(jp("type.ofType.kind", field), None)
             if type_kind == "NON_NULL" and field_kind == "SCALAR":
+                filtered_fields.append(field)
+            elif type_kind == "NON_NULL" and field_kind == "OBJECT":
                 filtered_fields.append(field)
 
         return {f["name"]: f["type"]["ofType"] for f in filtered_fields}
