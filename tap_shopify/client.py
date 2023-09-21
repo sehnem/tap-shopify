@@ -16,6 +16,7 @@ from singer_sdk.exceptions import FatalAPIError, RetriableAPIError
 from singer_sdk.helpers.jsonpath import extract_jsonpath
 from singer_sdk.pagination import SinglePagePaginator
 from singer_sdk.streams import GraphQLStream
+from memoization import cached
 
 from tap_shopify.exceptions import InvalidOperation, OperationFailed
 from tap_shopify.gql_queries import (
@@ -35,7 +36,7 @@ def verify_recursion(func):
         if not [f for f in stack() if f.function == func.__name__]:
             connections["in_conn"] = False
             objs.clear()
-        
+
         field_name = args[1]["name"]
         field_kind = args[1]["kind"]
 
@@ -59,7 +60,14 @@ class ShopifyStream(GraphQLStream):
 
     query_name = None
     single_object_params = None
-    ignore_objs = ["image", "metafield", "metafields", "metafieldconnection", "privateMetafield", "privateMetafields"]
+    ignore_objs = [
+        "image",
+        "metafield",
+        "metafields",
+        "metafieldconnection",
+        "privateMetafield",
+        "privateMetafields",
+    ]
     _requests_session = None
     denied_fields = []
     stream_connections = []
@@ -106,7 +114,7 @@ class ShopifyStream(GraphQLStream):
             return ["includeClosed: true"]
         return []
 
-    # @verify_connections
+    @cached
     @verify_recursion
     def extract_field_type(self, field) -> str:
         """Extract the field type from the schema."""
@@ -132,7 +140,10 @@ class ShopifyStream(GraphQLStream):
                 return None
             list_field_type = self.extract_field_type(obj_type)
             if list_field_type:
-                if obj_type["name"].endswith("Edge") and not "node" in list_field_type.type_dict["properties"].keys():
+                if (
+                    obj_type["name"].endswith("Edge")
+                    and not "node" in list_field_type.type_dict["properties"].keys()
+                ):
                     return None
                 return th.ArrayType(list_field_type)
         elif kind == "INTERFACE" and self.config.get("bulk"):
@@ -146,14 +157,20 @@ class ShopifyStream(GraphQLStream):
         elif kind == "SCALAR":
             return type_mapping.get(name, th.StringType)
 
+    def extract_gql_schema(self, gql_type):
+        """Extract the schema for the stream."""
+        gql_type_lw = gql_type.lower()
+        schema_gen = (s for s in self.schema_gql if s["name"].lower() == gql_type_lw)
+        return next(schema_gen, None)
+
     def get_fields_schema(self, fields) -> dict:
         """Build the schema for the stream."""
         # Filtering the fields that are not needed
         field_names = [f["name"] for f in fields]
         if "edges" in field_names:
-            fields = [f for f in fields if f["name"]=="edges"]
+            fields = [f for f in fields if f["name"] == "edges"]
         elif "node" in field_names:
-            fields = [f for f in fields if f["name"]=="node"]
+            fields = [f for f in fields if f["name"] == "node"]
 
         properties = []
         for field in fields:
@@ -167,10 +184,9 @@ class ShopifyStream(GraphQLStream):
                 continue
 
             if type_def.get("name") and type_def["name"].endswith("Connection"):
-                self.stream_connections.append(dict(
-                    name=field_name,
-                    of_type=type_def["name"][:-10]
-                ))
+                self.stream_connections.append(
+                    dict(name=field_name, of_type=type_def["name"][:-10])
+                )
 
             required = field["type"].get("kind") == "NON_NULL"
             field_type = self.extract_field_type(type_def)
@@ -179,12 +195,6 @@ class ShopifyStream(GraphQLStream):
                 property = th.Property(field_name, field_type, required=required)
                 properties.append(property)
         return properties
-
-    def extract_gql_schema(self, gql_type):
-        """Extract the schema for the stream."""
-        gql_type_lw = gql_type.lower()
-        schema_gen = (s for s in self.schema_gql if s["name"].lower() == gql_type_lw)
-        return next(schema_gen, None)
 
     @cached_property
     def catalog_dict(self):
@@ -202,7 +212,9 @@ class ShopifyStream(GraphQLStream):
             stream = (s for s in streams if s["tap_stream_id"] == self.name)
             stream_catalog = next(stream, None)
             if stream_catalog:
-                metadata = next(f for f in stream_catalog["metadata"] if not f["breadcrumb"])
+                metadata = next(
+                    f for f in stream_catalog["metadata"] if not f["breadcrumb"]
+                )
                 if not metadata["metadata"].get("selected"):
                     return stream_catalog["schema"]
 
@@ -224,7 +236,7 @@ class ShopifyStream(GraphQLStream):
                     or field_name == self.replication_key
                 ):
                     selected_properties.append(field_name)
-        return selected_properties    
+        return selected_properties
 
     @property
     def gql_selected_fields(self):
@@ -247,6 +259,13 @@ class ShopifyStream(GraphQLStream):
             return output
 
         return denest_schema(catalog)
+
+    @cached_property
+    def selected_connections(self):
+        """Return the selected connections for the stream."""
+        return [
+            c for c in self.stream_connections if c["name"] in self.selected_properties
+        ]
 
     def validate_response(self, response: requests.Response) -> None:
         """Validate HTTP response."""
@@ -313,6 +332,10 @@ class ShopifyStream(GraphQLStream):
         additional_args = ", " + ", ".join(self.additional_arguments)
         query = query.replace("__additional_args__", additional_args)
 
+        if self.selected_connections:
+            conn_names = list(set([c["name"] for c in self.selected_connections]))
+            for conn_name in conn_names:
+                query = query.replace(conn_name, f"{conn_name}(first:1)")
         return query
 
     def get_url_params(
@@ -404,7 +427,7 @@ class ShopifyStream(GraphQLStream):
 
         return response
 
-    def check_status(self, operation_id, sleep_time=10, timeout=1800):
+    def check_status(self, operation_id, sleep_time=10, timeout=3600):
         status_jsonpath = "$.data.currentBulkOperation"
         start = datetime.now().timestamp()
 
@@ -441,20 +464,21 @@ class ShopifyStream(GraphQLStream):
         main_item = None
         for line in output.iter_lines():
             line = simplejson.loads(line)
-            selected_connections = [c for c in self.stream_connections if c["name"] in self.selected_properties]
             if "__parentId" not in line.keys():
                 if main_item:
                     yield main_item
                 main_item = line
-                for sc in selected_connections:
+                for sc in self.selected_connections:
                     main_item[sc["name"]] = {}
                     main_item[sc["name"]]["edges"] = []
                 main_item["variants"] = {}
                 main_item["variants"]["edges"] = []
-            elif main_item["id"]==line["__parentId"]:
+            elif main_item["id"] == line["__parentId"]:
                 del line["__parentId"]
                 line_type = line["id"].split("/")[-2]
-                field_name = next(c["name"] for c in selected_connections if c["of_type"]==line_type)
+                field_name = next(
+                    c["name"] for c in self.selected_connections if c["of_type"] == line_type
+                )
                 main_item[field_name]["edges"].append(dict(node=line))
             else:
                 pass
@@ -469,7 +493,7 @@ class ShopifyStream(GraphQLStream):
     def query(self) -> str:
         """Set or return the GraphQL query string."""
         # TODO: figure out how to handle interfaces
-        # self.evaluate_query()
+        self.evaluate_query()
         if self.config.get("bulk"):
             return self.query_bulk()
         return self.query_gql()
