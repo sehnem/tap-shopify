@@ -445,6 +445,7 @@ class ShopifyStream(GraphQLStream):
                 return status["url"]
             if status["status"] == "FAILED":
                 raise InvalidOperation(f"Job failed: {status['errorCode']}")
+            self.logger.info(f"Bulk request with status {status.get('status')} - Object count: {status.get('objectCount')}")
             sleep(sleep_time)
         raise OperationFailed("Job Timeout")
 
