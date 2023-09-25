@@ -427,7 +427,7 @@ class ShopifyStream(GraphQLStream):
 
         return response
 
-    def check_status(self, operation_id, sleep_time=10, timeout=3600):
+    def check_status(self, operation_id, sleep_time=10, timeout=36000):
         status_jsonpath = "$.data.currentBulkOperation"
         start = datetime.now().timestamp()
 
