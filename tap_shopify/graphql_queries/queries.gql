@@ -1,0 +1,56 @@
+query IntrospectionQuery {
+  __schema {
+    queryType {
+      fields(includeDeprecated: true) {
+        name
+        description
+        args {
+          name
+          description
+          type {
+            ...TypeRef
+          }
+          defaultValue
+        }
+        type {
+          ...TypeRef
+        }
+        isDeprecated
+        deprecationReason
+      }
+    }
+  }
+}
+
+fragment TypeRef on __Type {
+  kind
+  name
+  ofType {
+    kind
+    name
+    ofType {
+      kind
+      name
+      ofType {
+        kind
+        name
+        ofType {
+          kind
+          name
+          ofType {
+            kind
+            name
+            ofType {
+              kind
+              name
+              ofType {
+                kind
+                name
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

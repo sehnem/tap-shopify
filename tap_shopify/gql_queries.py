@@ -157,35 +157,57 @@ fragment TypeRef on __Type {
 }"""
 
 
-queries_query = """{
+queries_query = """query IntrospectionQuery {
   __schema {
     queryType {
-      fields {
+      fields(includeDeprecated: true) {
         name
+        description
+        args {
+          name
+          description
+          type {
+            ...TypeRef
+          }
+          defaultValue
+        }
         type {
+          ...TypeRef
+        }
+        isDeprecated
+        deprecationReason
+      }
+    }
+  }
+}
+
+fragment TypeRef on __Type {
+  kind
+  name
+  ofType {
+    kind
+    name
+    ofType {
+      kind
+      name
+      ofType {
+        kind
+        name
+        ofType {
+          kind
           name
           ofType {
+            kind
             name
-            fields {
+            ofType {
+              kind
               name
-              type {
-                ofType {
-                  name
-                  kind
-                  ofType {
-                    name
-                    ofType {
-                      name
-                    }
-                    kind
-                  }
-                }
+              ofType {
+                kind
+                name
               }
             }
           }
-        }
-        args {
-          name
         }
       }
     }
